@@ -1,17 +1,26 @@
-name: Deploy to IONOS with Compose
+name: CI/CD Streamlit App (GHCR)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
+
+env:
+  REGISTRY: ghcr.io
+  # CAMBIA ESTO: Tu usuario de GitHub / nombre del repositorio actual (todo minúsculas)
+  IMAGE_NAME: jornkbz/TFM-EIP
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    permissions:
+      contents: read
+      packages: write
 
-      # 1. Login en Docker Hub (NECESITAS CREAR ESTOS SECRETS)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. Login en GitHub Container Registry
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -19,45 +28,61 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Construir y subir imagen
+      # 2. Extraer metadatos
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: type=raw,value=latest
+
+      # 3. Construir y Subir imagen a GHCR
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          # ¡CAMBIA ESTO POR TU USUARIO REAL DE DOCKER HUB!
-          tags: /srv/docker/airplane-streamlit-app
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
-      # 3. Copiar el docker-compose.prod.yml al servidor
-      - name: Copy Compose file to Server
+      # 4. Copiar el archivo docker-compose.prod.yml al servidor
+      # (Añadí este paso porque tu workflow de ejemplo no lo tenía, 
+      # pero es vital si cambias la configuración del docker-compose)
+      - name: Copy Compose file to VPS
         uses: appleboy/scp-action@master
         with:
-          # Usamos tus nombres de secrets:
           host: ${{ secrets.IONOS_HOST }}
           username: ${{ secrets.IONOS_USERNAME }}
           key: ${{ secrets.IONOS_SSH_KEY }}
-          port: ${{ secrets.ONOS_SSH_PORT }} # Opcional si es el 22
+          port: ${{ secrets.IONOS_SSH_PORT }} # Asegúrate que el secret no tenga typos
           source: "docker-compose.prod.yml"
-          target: "/root/mi-app-tfm"
+          target: "/srv/docker/airplane-streamlit-app"
 
-      # 4. Conectarse y desplegar
-      - name: Deploy on IONOS
-        uses: appleboy/ssh-action@master
+      # 5. Desplegar en IONOS
+      - name: Deploy to VPS using SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          # Usamos tus nombres de secrets:
           host: ${{ secrets.IONOS_HOST }}
           username: ${{ secrets.IONOS_USERNAME }}
           key: ${{ secrets.IONOS_SSH_KEY }}
-          port: ${{ secrets.ONOS_SSH_PORT }} # Opcional si es el 22
+          port: ${{ secrets.IONOS_SSH_PORT }}
+          
           script: |
-            # Crear carpeta si no existe (por seguridad)
-            mkdir -p /root/mi-app-tfm
+            # Ir a la carpeta del proyecto
+            # (Asegúrate de haber creado esta carpeta antes: mkdir -p /root/mi-app-tfm)
             cd /srv/docker/airplane-streamlit-app
             
-            # Renombrar archivo
-            mv docker-compose.prod.yml docker-compose.yml
+            # Renombrar el archivo copiado
+            # mv docker-compose.prod.yml docker-compose.yml
+
+            # Login en GHCR desde el servidor para poder descargar la imagen
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            # Descargar imagen nueva y reiniciar
+            # Descargar la nueva imagen
             docker compose pull
+            
+            # Reiniciar el servicio
             docker compose up -d --remove-orphans
+            
+            # Limpieza de imágenes viejas
             docker image prune -f
