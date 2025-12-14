@@ -10,11 +10,10 @@ env:
   IMAGE_NAME: jornkbz/tfm-eip
 
 jobs:
-  # JOB 1: Detectar cambios
+  # JOB 1: Detectar qué ha cambiado
   check_changes:
     runs-on: ubuntu-latest
     outputs:
-      # Definimos salidas para que los otros jobs sepan qué hacer
       image: ${{ steps.filter.outputs.image }}
       config: ${{ steps.filter.outputs.config }}
     steps:
@@ -30,11 +29,12 @@ jobs:
               - 'ML-Models/**'
             config:
               - 'docker-compose.prod.yml'
+              - '.github/workflows/deploy.yml' # <--- ¡Aquí está la clave! Si cambias el workflow, se detecta como config.
 
   # JOB 2: Construir imagen (Solo si cambió el código)
   build_image:
     needs: check_changes
-    # Solo corre si el filtro 'image' detectó cambios
+    # Solo se ejecuta si el filtro 'image' detectó cambios
     if: ${{ needs.check_changes.outputs.image == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -66,21 +66,20 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # JOB 3: Desplegar (Corre si hubo build O si cambió el compose)
+  # JOB 3: Desplegar en IONOS
   deploy:
     needs: [check_changes, build_image]
     runs-on: ubuntu-latest
-    # Esta condición es mágica:
-    # Corre si:
-    # 1. (Siempre que no haya fallado nada antes)
-    # 2. Y ADEMÁS: (Hubo cambios de imagen O hubo cambios de config)
+    # ESTA CONDICIÓN ES LA MAGIA:
+    # Se ejecuta SIEMPRE QUE:
+    # 1. No haya habido errores fatales antes.
+    # 2. Y ADEMÁS: (Se haya construido una imagen nueva O haya cambiado la configuración/workflow)
     if: ${{ always() && (needs.build_image.result == 'success' || needs.build_image.result == 'skipped') && (needs.check_changes.outputs.image == 'true' || needs.check_changes.outputs.config == 'true') }}
     
     steps:
-      - name: Checkout repository (necesario para copiar el archivo)
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Preparar carpeta en el VPS
       - name: Prepare VPS folder
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -90,12 +89,10 @@ jobs:
           port: ${{ secrets.IONOS_SSH_PORT }}
           script: |
             mkdir -p /srv/docker/airplane-streamlit-app
-            # Borramos el viejo por si acaso tiene permisos de root bloqueados
-            # Usamos sudo por si el archivo anterior se creó con permisos elevados
+            # Limpiamos archivos viejos para evitar conflictos
             sudo rm -f /srv/docker/airplane-streamlit-app/docker-compose.prod.yml
             sudo rm -f /srv/docker/airplane-streamlit-app/docker-compose.yml
 
-      # Copiar archivo
       - name: Copy Compose file to VPS
         uses: appleboy/scp-action@master
         with:
@@ -106,7 +103,6 @@ jobs:
           source: "docker-compose.prod.yml"
           target: "/srv/docker/airplane-streamlit-app"
 
-      # Ejecutar comandos SSH
       - name: Deploy on IONOS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -118,10 +114,14 @@ jobs:
             cd /srv/docker/airplane-streamlit-app
             mv docker-compose.prod.yml docker-compose.yml
             
-            # Login para bajar imagen (solo si hubo build nuevo, pero no hace daño hacerlo siempre)
+            # Login en GHCR (solo necesario si hubo imagen nueva, pero mal no hace)
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            # Pull y Up
+            # Descargamos cambios
             docker compose pull
+            
+            # Levantamos el servicio
             docker compose up -d --remove-orphans
+            
+            # Limpieza
             docker image prune -f
