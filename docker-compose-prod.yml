@@ -10,7 +10,8 @@ services:
     
     ports:
       - "8501:8501"
-    
+    networks:
+      - neura_django
     # En producción NO mapeamos las carpetas de código (Streamlit_app, ML-Models)
     # porque el código ya vive dentro de la imagen.
     # Solo mapeamos volúmenes si necesitas guardar datos (ej: una base de datos)
@@ -18,3 +19,8 @@ services:
     #   - ./datos_persistentes:/app/data
 
     restart: always
+
+networks:
+  neura_django:
+    external: true
+    
