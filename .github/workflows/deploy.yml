@@ -1,0 +1,62 @@
+name: Deploy to IONOS with Compose
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 1. Login en Docker Hub (NECESITAS CREAR ESTOS SECRETS)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 2. Construir y subir imagen
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          # ¡CAMBIA ESTO POR TU USUARIO REAL DE DOCKER HUB!
+          tags: /srv/docker/airplane-streamlit-app
+
+      # 3. Copiar el docker-compose.prod.yml al servidor
+      - name: Copy Compose file to Server
+        uses: appleboy/scp-action@master
+        with:
+          # Usamos tus nombres de secrets:
+          host: ${{ secrets.IONOS_HOST }}
+          username: ${{ secrets.IONOS_USERNAME }}
+          key: ${{ secrets.IONOS_SSH_KEY }}
+          port: ${{ secrets.ONOS_SSH_PORT }} # Opcional si es el 22
+          source: "docker-compose.prod.yml"
+          target: "/root/mi-app-tfm"
+
+      # 4. Conectarse y desplegar
+      - name: Deploy on IONOS
+        uses: appleboy/ssh-action@master
+        with:
+          # Usamos tus nombres de secrets:
+          host: ${{ secrets.IONOS_HOST }}
+          username: ${{ secrets.IONOS_USERNAME }}
+          key: ${{ secrets.IONOS_SSH_KEY }}
+          port: ${{ secrets.ONOS_SSH_PORT }} # Opcional si es el 22
+          script: |
+            # Crear carpeta si no existe (por seguridad)
+            mkdir -p /root/mi-app-tfm
+            cd /srv/docker/airplane-streamlit-app
+            
+            # Renombrar archivo
+            mv docker-compose.prod.yml docker-compose.yml
+            
+            # Descargar imagen nueva y reiniciar
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f

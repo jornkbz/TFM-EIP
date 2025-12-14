@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  streamlit-app:
+    # Construye la imagen usando el Dockerfile de la carpeta actual
+    build: .
+    
+    # Nombre del contenedor para identificarlo fácil
+    container_name: airplane-streamlit-app
+    
+    # Mapeo de puertos: [Puerto de tu PC]:[Puerto del contenedor]
+    ports:
+      - "8501:8501"
+    
+    # VOLÚMENES: Esto es lo mejor de Docker Compose.
+    # Conecta tus carpetas locales con el contenedor.
+    # Si cambias código en tu PC, se actualiza en la app sin reiniciar.
+    volumes:
+      - ./Streamlit_app:/app/Streamlit_app
+      - ./ML-Models:/app/ML-Models
+      # Mapeamos requirements.txt por si lo actualizas
+      - ./requirements.txt:/app/requirements.txt
+    
+    # Política de reinicio
+    restart: always

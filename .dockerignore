@@ -1,0 +1,15 @@
+# Control de versiones
+.git
+.gitignore
+
+# Documentación y archivos no necesarios en producción
+Memoria
+README.md
+
+# Entornos virtuales y caché de Python (¡Muy importante ignorar esto!)
+venv
+__pycache__
+*.pyc
+
+# Archivos de configuración local de Streamlit (opcional)
+.streamlit
