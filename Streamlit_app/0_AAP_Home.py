@@ -4,7 +4,7 @@ Modulo principal de ejecución para app Streamlit
 import streamlit as st
 
 #doc_url = 'https://github.com/jornkbz/TFM-EIP/blob/main_new/Memoria/Trabajo%20final%20de%20master.pdf'
-doc_url = 'https://github.com/jornkbz/TFM-EIP/main/Memoria/Trabajo%20final%20de%20master.pdf'
+doc_url = 'https://github.com/jornkbz/TFM-EIP/blob/main/Memoria/Trabajo%20final%20de%20master.pdf'
 repo_url = 'https://github.com/jornkbz/TFM-EIP'
 
 # CONFIGURACIÓN PÁGINA PRINCIPAL
