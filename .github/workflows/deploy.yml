@@ -28,7 +28,7 @@ jobs:
               - 'Streamlit_app/**'
               - 'ML-Models/**'
             config:
-              - 'docker-compose.prod.yml'
+              - 'docker-compose-prod.yml'
               - '.github/workflows/deploy.yml' # <--- ¡Aquí está la clave! Si cambias el workflow, se detecta como config.
 
   # JOB 2: Construir imagen (Solo si cambió el código)
@@ -90,7 +90,7 @@ jobs:
           script: |
             mkdir -p /srv/docker/airplane-streamlit-app
             # Limpiamos archivos viejos para evitar conflictos
-            rm -f /srv/docker/airplane-streamlit-app/docker-compose.prod.yml
+            rm -f /srv/docker/airplane-streamlit-app/docker-compose-prod.yml
             rm -f /srv/docker/airplane-streamlit-app/docker-compose.yml
 
       - name: Copy Compose file to VPS
@@ -112,7 +112,7 @@ jobs:
           port: ${{ secrets.IONOS_SSH_PORT }}
           script: |
             cd /srv/docker/airplane-streamlit-app
-            mv docker-compose.prod.yml docker-compose.yml
+            mv docker-compose-prod.yml docker-compose.yml
             
             # Login en GHCR (solo necesario si hubo imagen nueva, pero mal no hace)
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
