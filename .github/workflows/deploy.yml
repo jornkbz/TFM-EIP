@@ -90,8 +90,8 @@ jobs:
           script: |
             mkdir -p /srv/docker/airplane-streamlit-app
             # Limpiamos archivos viejos para evitar conflictos
-            sudo rm -f /srv/docker/airplane-streamlit-app/docker-compose.prod.yml
-            sudo rm -f /srv/docker/airplane-streamlit-app/docker-compose.yml
+            rm -f /srv/docker/airplane-streamlit-app/docker-compose.prod.yml
+            rm -f /srv/docker/airplane-streamlit-app/docker-compose.yml
 
       - name: Copy Compose file to VPS
         uses: appleboy/scp-action@master
