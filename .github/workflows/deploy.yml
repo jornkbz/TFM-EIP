@@ -45,7 +45,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # 4. Copiar el archivo docker-compose.prod.yml al servidor
+      # 4. Copiar el archivo docker-compose.yml al servidor
       # (Añadí este paso porque tu workflow de ejemplo no lo tenía, 
       # pero es vital si cambias la configuración del docker-compose)
       - name: Copy Compose file to VPS
@@ -55,7 +55,7 @@ jobs:
           username: ${{ secrets.IONOS_USERNAME }}
           key: ${{ secrets.IONOS_SSH_KEY }}
           port: ${{ secrets.IONOS_SSH_PORT }} # Asegúrate que el secret no tenga typos
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.yml"
           target: "/srv/docker/airplane-streamlit-app"
 
       # 5. Desplegar en IONOS
