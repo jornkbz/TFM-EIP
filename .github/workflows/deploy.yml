@@ -100,7 +100,7 @@ jobs:
           username: ${{ secrets.IONOS_USERNAME }}
           key: ${{ secrets.IONOS_SSH_KEY }}
           port: ${{ secrets.IONOS_SSH_PORT }}
-          source: "docker-compose.prod.yml"
+          source: "docker-compose-prod.yml"
           target: "/srv/docker/airplane-streamlit-app"
 
       - name: Deploy on IONOS
