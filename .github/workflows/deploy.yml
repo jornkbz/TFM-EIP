@@ -6,8 +6,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # CAMBIA ESTO: Tu usuario de GitHub / nombre del repositorio actual (todo minúsculas)
-  IMAGE_NAME: jornkbz/TFM-EIP
+  # Asegúrate de que esto esté en minúsculas
+  IMAGE_NAME: jornkbz/tfm-eip
 
 jobs:
   build-and-deploy:
@@ -20,7 +20,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. Login en GitHub Container Registry
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -28,7 +27,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Extraer metadatos
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -36,7 +34,6 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: type=raw,value=latest
 
-      # 3. Construir y Subir imagen a GHCR
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -45,20 +42,30 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # 4. Copiar el archivo docker-compose.yml al servidor
-      # (Añadí este paso porque tu workflow de ejemplo no lo tenía, 
-      # pero es vital si cambias la configuración del docker-compose)
+      # --- PASO CORREGIDO ---
+      - name: Prepare VPS folder
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.IONOS_HOST }}
+          username: ${{ secrets.IONOS_USERNAME }}
+          key: ${{ secrets.IONOS_SSH_KEY }}
+          port: ${{ secrets.IONOS_SSH_PORT }}
+          script: |
+            mkdir -p /srv/docker/airplane-streamlit-app
+            # Borrar archivos conflictivos
+            rm -f /srv/docker/airplane-streamlit-app/docker-compose.prod.yml
+            rm -f /srv/docker/airplane-streamlit-app/docker-compose.yml
+
       - name: Copy Compose file to VPS
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.IONOS_HOST }}
           username: ${{ secrets.IONOS_USERNAME }}
           key: ${{ secrets.IONOS_SSH_KEY }}
-          port: ${{ secrets.IONOS_SSH_PORT }} # Asegúrate que el secret no tenga typos
-          source: "docker-compose.yml"
+          port: ${{ secrets.IONOS_SSH_PORT }}
+          source: "docker-compose.prod.yml"
           target: "/srv/docker/airplane-streamlit-app"
 
-      # 5. Desplegar en IONOS
       - name: Deploy to VPS using SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -68,21 +75,12 @@ jobs:
           port: ${{ secrets.IONOS_SSH_PORT }}
           
           script: |
-            # Ir a la carpeta del proyecto
-            # (Asegúrate de haber creado esta carpeta antes: mkdir -p /root/mi-app-tfm)
             cd /srv/docker/airplane-streamlit-app
             
-            # Renombrar el archivo copiado
-            # mv docker-compose.prod.yml docker-compose.yml
+            mv docker-compose.prod.yml docker-compose.yml
 
-            # Login en GHCR desde el servidor para poder descargar la imagen
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            # Descargar la nueva imagen
             docker compose pull
-            
-            # Reiniciar el servicio
             docker compose up -d --remove-orphans
-            
-            # Limpieza de imágenes viejas
             docker image prune -f
